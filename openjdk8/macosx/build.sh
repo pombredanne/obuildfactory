@@ -143,7 +143,15 @@ function build_old()
   export BUILD_NUMBER="$OBF_BUILD_DATE"
   
   export LD_LIBRARY_PATH=
-  export ALT_BOOTDIR=`/usr/libexec/java_home -v 1.7`
+  if [ -z "$ALT_BOOTDIR" ]; then
+    if [ -z "$JAVA_HOME" ];
+    then
+      export ALT_BOOTDIR=`/usr/libexec/java_home -v 1.7`
+    else
+      export ALT_BOOTDIR=$JAVA_HOME
+    fi
+  fi
+  export ALT_BOOTDIR=$JAVA_HOME
   export ALLOW_DOWNLOADS=true
   export ALT_CACERTS_FILE=$OBF_DROP_DIR/cacerts
   export ALT_BOOTDIR=$ALT_BOOTDIR
@@ -196,6 +204,13 @@ function build_new()
     export JDK_BUILD_NUMBER=$OBF_BUILD_DATE
     export MILESTONE=$OBF_MILESTONE
     export COMPANY_NAME=$BUNDLE_VENDOR
+
+    if [ -z "$JAVA_HOME" ];
+    then
+      export OBF_BOOTDIR=`/usr/libexec/java_home -v 1.7`
+    else
+      export OBF_BOOTDIR=$JAVA_HOME
+    fi
     OBF_BOOTDIR=`/usr/libexec/java_home -v 1.7`
 	
     rm -rf $OBF_WORKSPACE_PATH/.ccache
@@ -236,7 +251,7 @@ function build_new()
 	    sh ../autoconf/configure --with-boot-jdk=$OBF_BOOTDIR --with-cacerts-file=$OBF_DROP_DIR/cacerts --with-ccache-dir=$OBF_WORKSPACE_PATH/.ccache
     fi
 
-    export IMAGE_BUILD_DIR=$OBF_SOURCES_PATH/build/$BUILD_PROFILE
+    export IMAGE_BUILD_DIR=$OBF_SOURCES_PATH/build/$BUILD_PROFILE/images
 	
 	if [ "$XCLEAN" = "true" ]; then
   	   CONF=$BUILD_PROFILE make clean
@@ -258,14 +273,14 @@ function test_build()
   if [ -x $IMAGE_BUILD_DIR/j2sdk-image/bin/java ]; then
     $IMAGE_BUILD_DIR/j2sdk-image/bin/java -version
   else
-    echo "can't find java into JDK $IMAGE_BUILD_DIR/j2sdk-image, build failed" 
+    echo "can't find java into JDK $IMAGE_BUILD_DIR/j2sdk-image/bin, build failed" 
     exit -1
    fi
 
    if [ -x $IMAGE_BUILD_DIR/j2re-image/bin/java ]; then
      $IMAGE_BUILD_DIR/j2re-image/bin/java -version
    else
-     echo "can't find java into JRE $IMAGE_BUILD_DIR/j2re-image, build failed" 
+     echo "can't find java into JRE $IMAGE_BUILD_DIR/j2re-image/bin, build failed" 
      exit -1
     fi
 }

@@ -40,7 +40,7 @@ function ensure_ant()
   if [ ! -x $OBF_DROP_DIR/ant/bin/ant ]; then
     mkdir -p $OBF_DROP_DIR/ant
     pushd $OBF_DROP_DIR/ant
-    curl -L http://mirrors.ircam.fr/pub/apache/ant/binaries/apache-ant-1.8.4-bin.tar.gz -o apache-ant-1.8.4-bin.tar.gz
+    curl -L http://archive.apache.org/dist/ant/binaries/apache-ant-1.8.4-bin.tar.gz -o apache-ant-1.8.4-bin.tar.gz
     tar xzf apache-ant-1.8.4-bin.tar.gz
     mv apache-ant-1.8.4/* .
     rmdir apache-ant-1.8.4
@@ -163,11 +163,20 @@ function build_old()
   export ANT_HOME=$ANT_HOME
   export ALT_FREETYPE_LIB_PATH=$OBF_FREETYPE_LIB_PATH
   export ALT_FREETYPE_HEADERS_PATH=$OBF_FREETYPE_HEADERS_PATH
+  export STATIC_CXX=false
 
+  if [ "$XDEBUG" = "true" ]; then
+    export SKIP_FASTDEBUG_BUILD=false
+  fi
+  
   if [ "$CPU_BUILD_ARCH" = "x86_64" ]; then
     export IMAGE_BUILD_DIR=$OBF_SOURCES_PATH/build/linux-amd64
   else
     export IMAGE_BUILD_DIR=$OBF_SOURCES_PATH/build/linux-i586
+  fi
+
+  if [ "$XCLEAN" = "true" ]; then
+    rm -rf $IMAGE_BUILD_DIR
   fi
 
   # Set Company Name to OBuildFactory
@@ -195,8 +204,10 @@ function build_new()
   pushd $OBF_SOURCES_PATH/common/makefiles >>/dev/null
   
   # patch common/autoconf/version.numbers
-  mv ../autoconf/version.numbers ../autoconf/version.numbers.orig 
-  cat ../autoconf/version.numbers.orig | grep -v "MILESTONE" | grep -v "JDK_BUILD_NUMBER" | grep -v "COMPANY_NAME" > ../autoconf/version.numbers
+  if [ -f ../autoconf/version.numbers ]; then
+    mv ../autoconf/version.numbers ../autoconf/version.numbers.orig 
+    cat ../autoconf/version.numbers.orig | grep -v "MILESTONE" | grep -v "JDK_BUILD_NUMBER" | grep -v "COMPANY_NAME" > ../autoconf/version.numbers
+  fi
 
   export JDK_BUILD_NUMBER=$OBF_BUILD_DATE
   export MILESTONE=$OBF_MILESTONE
@@ -205,11 +216,42 @@ function build_new()
   rm -rf $OBF_WORKSPACE_PATH/.ccache
   mkdir -p $OBF_WORKSPACE_PATH/.ccache
 
-  sh ../autoconf/configure --with-boot-jdk=$OBF_BOOTDIR --with-freetype=$OBF_FREETYPE_DIR --with-cacerts-file=$OBF_DROP_DIR/cacerts --with-ccache-dir=$OBF_WORKSPACE_PATH/.ccache
-  make images
+  if [ "$XDEBUG" = "true" ]; then
+
+	  if [ "$CPU_BUILD_ARCH" = "x86_64" ]; then
+	    BUILD_PROFILE=linux-x86_64-normal-server-fastdebug
+	  else
+  	    BUILD_PROFILE=linux-x86-normal-server-fastdebug
+	  fi
+  
+	  bash ../autoconf/configure --with-boot-jdk=$OBF_BOOTDIR --with-freetype=$OBF_DROP_DIR/freetype --with-cacerts-file=$OBF_DROP_DIR/cacerts --with-ccache-dir=$OBF_WORKSPACE_PATH/.ccache --enable-debug \
+                               --with-build-number=$OBF_BUILD_DATE --with-milestone=$OBF_MILESTONE
+
+  else
+
+	  if [ "$CPU_BUILD_ARCH" = "x86_64" ]; then
+	    BUILD_PROFILE=linux-x86_64-normal-server-release
+	  else
+	    BUILD_PROFILE=linux-x86-normal-server-release
+	  fi
+  
+	  bash ../autoconf/configure --with-boot-jdk=$OBF_BOOTDIR --with-freetype=$OBF_FREETYPE_DIR --with-cacerts-file=$OBF_DROP_DIR/cacerts --with-ccache-dir=$OBF_WORKSPACE_PATH/.ccache \
+                               --with-build-number=$OBF_BUILD_DATE --with-milestone=$OBF_MILESTONE
+
+  fi
+
+  export IMAGE_BUILD_DIR=$OBF_SOURCES_PATH/build/$BUILD_PROFILE/images
+
+  if [ "$XCLEAN" = "true" ]; then
+	  CONT=$BUILD_PROFILE make clean
+  fi
+  
+  CONT=$BUILD_PROFILE make images
 
   # restore original common/autoconf/version.numbers
-  mv ../autoconf/version.numbers.orig ../autoconf/version.numbers
+  if [ -f ../autoconf/version.numbers.orig ]; then
+    mv ../autoconf/version.numbers.orig ../autoconf/version.numbers
+  fi
 
   popd >>/dev/null
 }
@@ -241,12 +283,17 @@ function archive_build()
 {
   pushd $IMAGE_BUILD_DIR
   mkdir -p $OBF_DROP_DIR/$OBF_PROJECT_NAME
-  tar cjf $OBF_DROP_DIR/$OBF_PROJECT_NAME/j2sdk-image-$CPU_BUILD_ARCH.tar.bz2 jdk-module-image
-  tar cjf $OBF_DROP_DIR/$OBF_PROJECT_NAME/j2re-image-$CPU_BUILD_ARCH.tar.bz2 jre-module-image
+
+  if [ "$XDEBUG" = "true" ]; then
+  	FILENAME_PREFIX="-fastdebug"
+  fi
+		
+  tar cjf $OBF_DROP_DIR/$OBF_PROJECT_NAME/j2sdk-image$FILENAME_PREFIX-$OBF_BASE_ARCH-$OBF_BUILD_NUMBER-$OBF_BUILD_DATE.tar.bz2 j2sdk-image
+  tar cjf $OBF_DROP_DIR/$OBF_PROJECT_NAME/j2re-image$FILENAME_PREFIX-$OBF_BASE_ARCH-$OBF_BUILD_NUMBER-$OBF_BUILD_DATE.tar.bz2 j2re-image
   
   echo "produced tarball files under $OBF_DROP_DIR/$OBF_PROJECT_NAME"
-  ls -l $OBF_DROP_DIR/$OBF_PROJECT_NAME/j2sdk-image-$CPU_BUILD_ARCH.tar.bz2
-  ls -l $OBF_DROP_DIR/$OBF_PROJECT_NAME/j2re-image-$CPU_BUILD_ARCH.tar.bz2
+  ls -l $OBF_DROP_DIR/$OBF_PROJECT_NAME/j2sdk-image$FILENAME_PREFIX-$OBF_BASE_ARCH-$OBF_BUILD_NUMBER-$OBF_BUILD_DATE.tar.bz2
+  ls -l $OBF_DROP_DIR/$OBF_PROJECT_NAME/j2re-image$FILENAME_PREFIX-$OBF_BASE_ARCH-$OBF_BUILD_NUMBER-$OBF_BUILD_DATE.tar.bz2
   
   popd
 }
@@ -255,7 +302,7 @@ function archive_build()
 # Build start here
 #
 
-CPU_BUILD_ARCH=`uname -p`
+CPU_BUILD_ARCH=`uname -m`
 
 export JDK_BUNDLE_VENDOR="OBuildFactory"
 export BUNDLE_VENDOR="OBuildFactory"

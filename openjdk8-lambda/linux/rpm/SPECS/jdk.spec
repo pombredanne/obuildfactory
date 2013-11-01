@@ -90,7 +90,7 @@ Provides: jdbc-stdext = 3.0
 Provides: java-sasl = %{epoch}:%{version}
 Provides: java-fonts = %{epoch}:%{version}
 
-License:  GPL
+License:  GPL-2.0
 URL:      http://openjdk.java.net
 
 SOURCE0: j2sdk-image.tar.bz2
@@ -224,5 +224,14 @@ rm -rf %{buildroot}
 %{jdkdir}/src.zip
 
 %changelog
+* Tue Feb 5 2013 henri.gomez@gmail.com 1.8.0-lambda.b72-1
+- man pages are back
+
+* Mon Feb 4 2013 henri.gomez@gmail.com 1.8.0-lambda.b56-2
+- demo, samples and src packages are back
+
+* Wed Jan 16 2013 henri.gomez@gmail.com 1.8.0-lambda.b56-1
+- Remove subpackages demo, sample and src since contents is not in built images
+
 * Sat Sep 1 2012 henri.gomez@gmail.com 1.8.0-lambda.b50-1
 - Initial package
